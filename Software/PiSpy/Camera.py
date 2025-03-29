@@ -6,16 +6,12 @@ from picamera2 import Picamera2
 class CameraInfoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Picamera2 Camera Information")
-        self.root.geometry("800x600")
+        self.root.title("Camera Information")
+        self.root.geometry("800x480")
         
         # Main frame
         self.main_frame = ttk.Frame(root, padding="10")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Create header
-        header_label = ttk.Label(self.main_frame, text="Camera Information", font=("Arial", 16, "bold"))
-        header_label.pack(pady=10)
         
         # Create notebook (tabs)
         self.notebook = ttk.Notebook(self.main_frame)
@@ -30,32 +26,10 @@ class CameraInfoApp:
         self.notebook.add(self.sensor_modes_tab, text="Sensor Modes")
         self.notebook.add(self.config_tab, text="Configurations")
         
-        # Camera list tab content
-        self.camera_list_frame = ttk.Frame(self.camera_list_tab, padding="10")
-        self.camera_list_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Sensor modes tab content
-        self.sensor_modes_frame = ttk.Frame(self.sensor_modes_tab, padding="10")
-        self.sensor_modes_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Configurations tab content
-        self.config_frame = ttk.Frame(self.config_tab, padding="10")
-        self.config_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Create text widgets for each tab
-        self.camera_list_text = tk.Text(self.camera_list_frame, wrap=tk.WORD, height=20, width=80)
-        self.camera_list_text.pack(fill=tk.BOTH, expand=True)
-        
-        self.sensor_modes_text = tk.Text(self.sensor_modes_frame, wrap=tk.WORD, height=20, width=80)
-        self.sensor_modes_text.pack(fill=tk.BOTH, expand=True)
-        
-        self.config_text = tk.Text(self.config_frame, wrap=tk.WORD, height=20, width=80)
-        self.config_text.pack(fill=tk.BOTH, expand=True)
-        
-        # Add scrollbars
-        self.add_scrollbar(self.camera_list_frame, self.camera_list_text)
-        self.add_scrollbar(self.sensor_modes_frame, self.sensor_modes_text)
-        self.add_scrollbar(self.config_frame, self.config_text)
+        # Set up each tab with text widget and scrollbar
+        self.setup_text_with_scrollbar(self.camera_list_tab, "camera_list_text")
+        self.setup_text_with_scrollbar(self.sensor_modes_tab, "sensor_modes_text")
+        self.setup_text_with_scrollbar(self.config_tab, "config_text")
         
         # Add refresh button
         self.refresh_button = ttk.Button(self.main_frame, text="Refresh Camera Info", command=self.refresh_camera_info)
@@ -70,10 +44,24 @@ class CameraInfoApp:
         # Load camera info when app starts
         self.load_camera_info()
     
-    def add_scrollbar(self, parent, text_widget):
-        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=text_widget.yview)
+    def setup_text_with_scrollbar(self, parent, text_attr_name):
+        # Create a frame to hold the text widget and scrollbar
+        frame = ttk.Frame(parent)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Create vertical scrollbar
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        text_widget.config(yscrollcommand=scrollbar.set)
+        
+        # Create text widget
+        text_widget = tk.Text(frame, wrap=tk.WORD, yscrollcommand=scrollbar.set)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Configure scrollbar to work with text widget
+        scrollbar.config(command=text_widget.yview)
+        
+        # Store reference to text widget
+        setattr(self, text_attr_name, text_widget)
     
     def load_camera_info(self):
         self.status_var.set("Loading camera information...")
