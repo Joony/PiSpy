@@ -14,8 +14,9 @@ from picamera2.outputs import FileOutput
 class CameraInfoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Picamera2 Advanced Interface")
-        self.root.geometry("900x700")
+        self.root.title("Picamera2 Interface")
+        # Set appropriate size for 7" touchscreen
+        self.root.geometry("800x480")
         
         # Define default directories
         self.video_dir = os.path.expanduser("~/Videos")
@@ -53,6 +54,14 @@ class CameraInfoApp:
         self.still_custom_width = tk.StringVar(value="3280")
         self.still_custom_height = tk.StringVar(value="2464")
         
+        # Use a more compact style for small screens
+        self.style = ttk.Style()
+        self.style.configure('TButton', padding=2)
+        self.style.configure('TLabel', padding=1)
+        self.style.configure('TFrame', padding=2)
+        self.style.configure('TLabelframe', padding=2)
+        self.style.configure('TNotebook.Tab', padding=(5, 2))
+        
         # Create main UI structure
         self.create_ui()
         
@@ -65,24 +74,24 @@ class CameraInfoApp:
     
     def create_ui(self):
         # Main frame
-        self.main_frame = ttk.Frame(self.root, padding="10")
+        self.main_frame = ttk.Frame(self.root, padding=2)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Create header with camera selector
+        # Create header with camera selector (simplified)
         self.create_header()
         
         # Create notebook (tabs)
         self.notebook = ttk.Notebook(self.main_frame)
-        self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=2)
         
         # Create tabs
         self.camera_info_tab = ttk.Frame(self.notebook)
         self.still_tab = ttk.Frame(self.notebook)
         self.video_tab = ttk.Frame(self.notebook)
         
-        self.notebook.add(self.camera_info_tab, text="Camera Info")
-        self.notebook.add(self.still_tab, text="Still Capture")
-        self.notebook.add(self.video_tab, text="Video Recording")
+        self.notebook.add(self.camera_info_tab, text="Info")
+        self.notebook.add(self.still_tab, text="Photo")
+        self.notebook.add(self.video_tab, text="Video")
         
         # Setup tabs
         self.setup_camera_info_tab()
@@ -90,12 +99,12 @@ class CameraInfoApp:
         self.setup_video_tab()
         
         # Setup preview frame
-        self.preview_frame = ttk.LabelFrame(self.main_frame, text="Camera Preview")
-        self.preview_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.preview_frame = ttk.LabelFrame(self.main_frame, text="Preview")
+        self.preview_frame.pack(fill=tk.BOTH, expand=True, pady=2)
         
-        # Preview canvas
-        self.preview_canvas = tk.Canvas(self.preview_frame, bg="black")
-        self.preview_canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Preview canvas (make it short to accommodate other controls)
+        self.preview_canvas = tk.Canvas(self.preview_frame, bg="black", height=180)
+        self.preview_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Close preview button (initially hidden)
         self.close_preview_btn = ttk.Button(
@@ -111,275 +120,290 @@ class CameraInfoApp:
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
     
     def create_header(self):
+        # Simplified header
         header_frame = ttk.Frame(self.main_frame)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
+        header_frame.pack(fill=tk.X, pady=2)
         
-        # App title
-        header_label = ttk.Label(
-            header_frame, 
-            text="Picamera2 Advanced Interface", 
-            font=("Arial", 16, "bold")
-        )
-        header_label.pack(side=tk.LEFT, pady=10)
+        # Left side: Camera selector
+        camera_label = ttk.Label(header_frame, text="Camera:")
+        camera_label.pack(side=tk.LEFT, padx=2)
         
-        # Camera selector frame
-        camera_selector_frame = ttk.Frame(header_frame)
-        camera_selector_frame.pack(side=tk.RIGHT, pady=10)
-        
-        # Camera selector label
-        camera_label = ttk.Label(camera_selector_frame, text="Camera:")
-        camera_label.pack(side=tk.LEFT, padx=(0, 5))
-        
-        # Camera selector dropdown
         self.camera_dropdown = ttk.Combobox(
-            camera_selector_frame, 
+            header_frame, 
             textvariable=self.selected_camera_index, 
             state="readonly",
-            width=30
+            width=20  # Shorter width
         )
-        self.camera_dropdown.pack(side=tk.LEFT)
+        self.camera_dropdown.pack(side=tk.LEFT, padx=2)
         self.camera_dropdown.bind("<<ComboboxSelected>>", self.on_camera_selected)
         
-        # Refresh camera button
+        # Right side: Refresh button
         refresh_btn = ttk.Button(
-            camera_selector_frame, 
-            text="Refresh", 
+            header_frame, 
+            text="↻", 
             command=self.refresh_camera_info,
-            width=8
+            width=3  # Smaller button
         )
-        refresh_btn.pack(side=tk.LEFT, padx=5)
+        refresh_btn.pack(side=tk.RIGHT, padx=2)
     
     def setup_camera_info_tab(self):
-        # Create frames for organization
-        info_frame = ttk.Frame(self.camera_info_tab, padding=10)
-        info_frame.pack(fill=tk.BOTH, expand=True)
+        # Use a paned window for better space management
+        paned = ttk.PanedWindow(self.camera_info_tab, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Split the frame into two columns
-        left_frame = ttk.Frame(info_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
-        
-        right_frame = ttk.Frame(info_frame)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        # Camera details section
-        camera_details_frame = ttk.LabelFrame(left_frame, text="Camera Details")
-        camera_details_frame.pack(fill=tk.BOTH, expand=True)
+        # Camera details frame
+        camera_details_frame = ttk.LabelFrame(paned, text="Camera Details")
         
         # Create scrollbar and text widget for camera details
         camera_details_scroll = ttk.Scrollbar(camera_details_frame)
         camera_details_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.camera_details_text = tk.Text(camera_details_frame, wrap=tk.WORD)
+        self.camera_details_text = tk.Text(camera_details_frame, wrap=tk.WORD, height=10)
         self.camera_details_text.pack(fill=tk.BOTH, expand=True)
         
         camera_details_scroll.config(command=self.camera_details_text.yview)
         self.camera_details_text.config(yscrollcommand=camera_details_scroll.set)
         
-        # Sensor modes section
-        sensor_modes_frame = ttk.LabelFrame(right_frame, text="Sensor Modes")
-        sensor_modes_frame.pack(fill=tk.BOTH, expand=True)
+        # Sensor modes frame
+        sensor_modes_frame = ttk.LabelFrame(paned, text="Sensor Modes")
         
         # Create scrollbar and text widget for sensor modes
         sensor_modes_scroll = ttk.Scrollbar(sensor_modes_frame)
         sensor_modes_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.sensor_modes_text = tk.Text(sensor_modes_frame, wrap=tk.WORD)
+        self.sensor_modes_text = tk.Text(sensor_modes_frame, wrap=tk.WORD, height=10)
         self.sensor_modes_text.pack(fill=tk.BOTH, expand=True)
         
         sensor_modes_scroll.config(command=self.sensor_modes_text.yview)
         self.sensor_modes_text.config(yscrollcommand=sensor_modes_scroll.set)
+        
+        # Add frames to paned window
+        paned.add(camera_details_frame, weight=1)
+        paned.add(sensor_modes_frame, weight=1)
     
     def setup_still_tab(self):
-        control_frame = ttk.Frame(self.still_tab, padding=10)
-        control_frame.pack(fill=tk.BOTH, expand=True)
+        # Use a notebook inside the tab for better space organization
+        inner_notebook = ttk.Notebook(self.still_tab)
+        inner_notebook.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Left side - Controls
-        left_frame = ttk.Frame(control_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        # Create sub-tabs
+        settings_tab = ttk.Frame(inner_notebook)
+        output_tab = ttk.Frame(inner_notebook)
         
+        inner_notebook.add(settings_tab, text="Settings")
+        inner_notebook.add(output_tab, text="Output")
+        
+        # Settings tab
         # Resolution section
-        res_frame = ttk.LabelFrame(left_frame, text="Resolution Settings")
-        res_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
+        res_frame = ttk.LabelFrame(settings_tab, text="Resolution")
+        res_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        # Resolution dropdown
-        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.still_res_dropdown = ttk.Combobox(res_frame, textvariable=self.still_resolution, state="readonly")
-        self.still_res_dropdown.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        # Grid layout for compactness
+        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.still_res_dropdown = ttk.Combobox(res_frame, textvariable=self.still_resolution, state="readonly", width=15)
+        self.still_res_dropdown.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
         self.still_res_dropdown.bind("<<ComboboxSelected>>", self.on_still_resolution_changed)
         
         # Custom resolution
+        ttk.Label(res_frame, text="Custom:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        
         custom_frame = ttk.Frame(res_frame)
-        custom_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        custom_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
         
-        ttk.Label(custom_frame, text="Width:").pack(side=tk.LEFT, padx=(0, 5))
-        width_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_width, width=6)
-        width_entry.pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(custom_frame, text="W:").pack(side=tk.LEFT)
+        width_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_width, width=5)
+        width_entry.pack(side=tk.LEFT, padx=(0, 2))
         
-        ttk.Label(custom_frame, text="Height:").pack(side=tk.LEFT, padx=(0, 5))
-        height_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_height, width=6)
+        ttk.Label(custom_frame, text="H:").pack(side=tk.LEFT)
+        height_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_height, width=5)
         height_entry.pack(side=tk.LEFT)
         
         # Apply custom button
-        apply_custom_btn = ttk.Button(custom_frame, text="Apply Custom", command=self.apply_custom_still_resolution)
-        apply_custom_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # Output section
-        output_frame = ttk.LabelFrame(left_frame, text="Output Settings")
-        output_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
-        
-        # Output folder
-        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.still_dir_var = tk.StringVar(value=self.photo_dir)
-        dir_entry = ttk.Entry(output_frame, textvariable=self.still_dir_var)
-        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        browse_btn = ttk.Button(output_frame, text="Browse", command=lambda: self.browse_directory("still"))
-        browse_btn.grid(row=0, column=2, padx=5, pady=5)
-        
-        # Filename prefix
-        ttk.Label(output_frame, text="Filename prefix:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        self.still_prefix_var = tk.StringVar(value="photo_")
-        prefix_entry = ttk.Entry(output_frame, textvariable=self.still_prefix_var)
-        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_still_resolution, width=6)
+        apply_custom_btn.grid(row=1, column=2, padx=2, pady=2)
         
         # Format selection
-        ttk.Label(output_frame, text="Format:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Label(res_frame, text="Format:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
         self.still_format_var = tk.StringVar(value=".jpg")
-        format_combo = ttk.Combobox(output_frame, textvariable=self.still_format_var, values=[".jpg", ".png"], state="readonly")
-        format_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        format_combo = ttk.Combobox(res_frame, textvariable=self.still_format_var, values=[".jpg", ".png"], state="readonly", width=5)
+        format_combo.grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
         
         # Actions section
-        actions_frame = ttk.LabelFrame(left_frame, text="Actions")
-        actions_frame.pack(fill=tk.X, expand=False)
+        actions_frame = ttk.LabelFrame(settings_tab, text="Actions")
+        actions_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        # Preview and capture buttons
+        # Use grid for buttons to place them horizontally
         preview_btn = ttk.Button(actions_frame, text="Preview (10s)", command=lambda: self.start_preview("still"))
-        preview_btn.pack(fill=tk.X, padx=5, pady=5)
+        preview_btn.grid(row=0, column=0, padx=2, pady=2, sticky=(tk.W, tk.E))
         
         capture_btn = ttk.Button(actions_frame, text="Capture Photo", command=self.capture_photo)
-        capture_btn.pack(fill=tk.X, padx=5, pady=5)
+        capture_btn.grid(row=0, column=1, padx=2, pady=2, sticky=(tk.W, tk.E))
         
-        # Right side - Image info and thumbnail
-        right_frame = ttk.Frame(control_frame)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        # Configure grid weights
+        actions_frame.columnconfigure(0, weight=1)
+        actions_frame.columnconfigure(1, weight=1)
         
-        # Last image info
-        info_frame = ttk.LabelFrame(right_frame, text="Image Information")
-        info_frame.pack(fill=tk.BOTH, expand=True)
+        # Output tab
+        # Output settings
+        output_frame = ttk.LabelFrame(output_tab, text="Output Settings")
+        output_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        self.still_info_text = tk.Text(info_frame, wrap=tk.WORD, height=8)
-        self.still_info_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Save folder
+        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.still_dir_var = tk.StringVar(value=self.photo_dir)
+        dir_entry = ttk.Entry(output_frame, textvariable=self.still_dir_var)
+        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        browse_btn = ttk.Button(output_frame, text="...", command=lambda: self.browse_directory("still"), width=3)
+        browse_btn.grid(row=0, column=2, padx=2, pady=2)
+        
+        # Filename prefix
+        ttk.Label(output_frame, text="Prefix:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        self.still_prefix_var = tk.StringVar(value="photo_")
+        prefix_entry = ttk.Entry(output_frame, textvariable=self.still_prefix_var)
+        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Configure column weights
+        output_frame.columnconfigure(1, weight=1)
+        
+        # Image info
+        info_frame = ttk.LabelFrame(output_tab, text="Image Information")
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=2, padx=2)
+        
+        self.still_info_text = tk.Text(info_frame, wrap=tk.WORD, height=6)
+        self.still_info_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         self.still_info_text.insert(tk.END, "No images captured yet.")
     
     def setup_video_tab(self):
-        control_frame = ttk.Frame(self.video_tab, padding=10)
-        control_frame.pack(fill=tk.BOTH, expand=True)
+        # Use a notebook inside the tab for better space organization
+        inner_notebook = ttk.Notebook(self.video_tab)
+        inner_notebook.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Left side - Controls
-        left_frame = ttk.Frame(control_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        # Create sub-tabs
+        settings_tab = ttk.Frame(inner_notebook)
+        encoder_tab = ttk.Frame(inner_notebook)
+        output_tab = ttk.Frame(inner_notebook)
         
+        inner_notebook.add(settings_tab, text="Settings")
+        inner_notebook.add(encoder_tab, text="Encoder")
+        inner_notebook.add(output_tab, text="Output")
+        
+        # Settings tab
         # Resolution section
-        res_frame = ttk.LabelFrame(left_frame, text="Resolution Settings")
-        res_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
+        res_frame = ttk.LabelFrame(settings_tab, text="Resolution")
+        res_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        # Resolution dropdown
-        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.video_res_dropdown = ttk.Combobox(res_frame, textvariable=self.video_resolution, state="readonly")
-        self.video_res_dropdown.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        # Grid layout for compactness
+        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_res_dropdown = ttk.Combobox(res_frame, textvariable=self.video_resolution, state="readonly", width=15)
+        self.video_res_dropdown.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=2, pady=2)
         self.video_res_dropdown.bind("<<ComboboxSelected>>", self.on_video_resolution_changed)
         
         # Framerate
-        ttk.Label(res_frame, text="Framerate:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        framerate_entry = ttk.Entry(res_frame, textvariable=self.video_framerate, width=6)
-        framerate_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        ttk.Label(res_frame, text="Framerate:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        framerate_entry = ttk.Entry(res_frame, textvariable=self.video_framerate, width=5)
+        framerate_entry.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(res_frame, text="fps").grid(row=1, column=2, sticky=tk.W, padx=2, pady=2)
         
         # Custom resolution
+        ttk.Label(res_frame, text="Custom:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        
         custom_frame = ttk.Frame(res_frame)
-        custom_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        custom_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
         
-        ttk.Label(custom_frame, text="Width:").pack(side=tk.LEFT, padx=(0, 5))
-        width_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_width, width=6)
-        width_entry.pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(custom_frame, text="W:").pack(side=tk.LEFT)
+        width_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_width, width=5)
+        width_entry.pack(side=tk.LEFT, padx=(0, 2))
         
-        ttk.Label(custom_frame, text="Height:").pack(side=tk.LEFT, padx=(0, 5))
-        height_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_height, width=6)
+        ttk.Label(custom_frame, text="H:").pack(side=tk.LEFT)
+        height_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_height, width=5)
         height_entry.pack(side=tk.LEFT)
         
         # Apply custom button
-        apply_custom_btn = ttk.Button(custom_frame, text="Apply Custom", command=self.apply_custom_video_resolution)
-        apply_custom_btn.pack(side=tk.RIGHT, padx=5)
+        apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_video_resolution, width=6)
+        apply_custom_btn.grid(row=2, column=2, padx=2, pady=2)
         
-        # Encoder section
-        encoder_frame = ttk.LabelFrame(left_frame, text="Encoder Settings")
-        encoder_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
+        # Actions for video
+        actions_frame = ttk.LabelFrame(settings_tab, text="Actions")
+        actions_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        # Encoder selection
-        ttk.Label(encoder_frame, text="Encoder:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        encoder_combo = ttk.Combobox(encoder_frame, textvariable=self.video_encoder, 
-                                    values=["H264Encoder", "MJPEGEncoder"], state="readonly")
-        encoder_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        # Format selection
-        ttk.Label(encoder_frame, text="Format:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        format_combo = ttk.Combobox(encoder_frame, textvariable=self.video_format, 
-                                   values=[".mp4", ".h264", ".mjpg"], state="readonly")
-        format_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        # Quality selection
-        ttk.Label(encoder_frame, text="Quality:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-        self.video_quality_var = tk.StringVar(value="High")
-        quality_combo = ttk.Combobox(encoder_frame, textvariable=self.video_quality_var, 
-                                    values=["Very Low", "Low", "Medium", "High", "Very High"], state="readonly")
-        quality_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        # Output section
-        output_frame = ttk.LabelFrame(left_frame, text="Output Settings")
-        output_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
-        
-        # Output folder
-        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.video_dir_var = tk.StringVar(value=self.video_dir)
-        dir_entry = ttk.Entry(output_frame, textvariable=self.video_dir_var)
-        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        browse_btn = ttk.Button(output_frame, text="Browse", command=lambda: self.browse_directory("video"))
-        browse_btn.grid(row=0, column=2, padx=5, pady=5)
-        
-        # Filename prefix
-        ttk.Label(output_frame, text="Filename prefix:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        self.video_prefix_var = tk.StringVar(value="video_")
-        prefix_entry = ttk.Entry(output_frame, textvariable=self.video_prefix_var)
-        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        # Recording duration
-        ttk.Label(output_frame, text="Duration (sec):").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-        self.video_duration_var = tk.StringVar(value="10")
-        duration_entry = ttk.Entry(output_frame, textvariable=self.video_duration_var)
-        duration_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
-        
-        # Actions section
-        actions_frame = ttk.LabelFrame(left_frame, text="Actions")
-        actions_frame.pack(fill=tk.X, expand=False)
-        
-        # Preview and record buttons
+        # Use grid for buttons to place them horizontally
         preview_btn = ttk.Button(actions_frame, text="Preview (10s)", command=lambda: self.start_preview("video"))
-        preview_btn.pack(fill=tk.X, padx=5, pady=5)
+        preview_btn.grid(row=0, column=0, padx=2, pady=2, sticky=(tk.W, tk.E))
         
         self.record_btn = ttk.Button(actions_frame, text="Record Video", command=self.record_video)
-        self.record_btn.pack(fill=tk.X, padx=5, pady=5)
+        self.record_btn.grid(row=0, column=1, padx=2, pady=2, sticky=(tk.W, tk.E))
         
-        # Right side - Video info and thumbnail
-        right_frame = ttk.Frame(control_frame)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        # Configure grid weights
+        actions_frame.columnconfigure(0, weight=1)
+        actions_frame.columnconfigure(1, weight=1)
         
-        # Last video info
-        info_frame = ttk.LabelFrame(right_frame, text="Video Information")
-        info_frame.pack(fill=tk.BOTH, expand=True)
+        # Encoder tab
+        # Encoder settings
+        encoder_frame = ttk.LabelFrame(encoder_tab, text="Encoder Settings")
+        encoder_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
         
-        self.video_info_text = tk.Text(info_frame, wrap=tk.WORD, height=8)
-        self.video_info_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Encoder selection
+        ttk.Label(encoder_frame, text="Encoder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        encoder_combo = ttk.Combobox(encoder_frame, textvariable=self.video_encoder, 
+                                    values=["H264Encoder", "MJPEGEncoder"], state="readonly", width=12)
+        encoder_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Format selection
+        ttk.Label(encoder_frame, text="Format:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        format_combo = ttk.Combobox(encoder_frame, textvariable=self.video_format, 
+                                   values=[".mp4", ".h264", ".mjpg"], state="readonly", width=6)
+        format_combo.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        
+        # Quality selection
+        ttk.Label(encoder_frame, text="Quality:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_quality_var = tk.StringVar(value="High")
+        quality_combo = ttk.Combobox(encoder_frame, textvariable=self.video_quality_var, 
+                                    values=["Very Low", "Low", "Medium", "High", "Very High"], state="readonly", width=10)
+        quality_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Recording duration
+        ttk.Label(encoder_frame, text="Duration:").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
+        duration_frame = ttk.Frame(encoder_frame)
+        duration_frame.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        self.video_duration_var = tk.StringVar(value="10")
+        duration_entry = ttk.Entry(duration_frame, textvariable=self.video_duration_var, width=5)
+        duration_entry.pack(side=tk.LEFT)
+        ttk.Label(duration_frame, text="sec").pack(side=tk.LEFT, padx=2)
+        
+        # Output tab
+        # Output settings
+        output_frame = ttk.LabelFrame(output_tab, text="Output Settings")
+        output_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        # Save folder
+        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_dir_var = tk.StringVar(value=self.video_dir)
+        dir_entry = ttk.Entry(output_frame, textvariable=self.video_dir_var)
+        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        browse_btn = ttk.Button(output_frame, text="...", command=lambda: self.browse_directory("video"), width=3)
+        browse_btn.grid(row=0, column=2, padx=2, pady=2)
+        
+        # Filename prefix
+        ttk.Label(output_frame, text="Prefix:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_prefix_var = tk.StringVar(value="video_")
+        prefix_entry = ttk.Entry(output_frame, textvariable=self.video_prefix_var)
+        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Configure column weights
+        output_frame.columnconfigure(1, weight=1)
+        
+        # Video info
+        info_frame = ttk.LabelFrame(output_tab, text="Video Information")
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=2, padx=2)
+        
+        self.video_info_text = tk.Text(info_frame, wrap=tk.WORD, height=6)
+        self.video_info_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         self.video_info_text.insert(tk.END, "No videos recorded yet.")
+    
+    # The rest of the methods remain the same as in the previous implementation
     
     def initialize_camera(self):
         try:
@@ -389,7 +413,7 @@ class CameraInfoApp:
             self.picam2 = Picamera2()
             self.status_var.set("Camera initialized")
         except Exception as e:
-            self.status_var.set(f"Camera initialization error: {str(e)}")
+            self.status_var.set(f"Camera error: {str(e)}")
     
     def load_camera_info(self):
         self.status_var.set("Loading camera information...")
@@ -404,10 +428,10 @@ class CameraInfoApp:
             self.root.after(0, self.update_camera_dropdown)
             
             # Update status
-            self.root.after(0, lambda: self.status_var.set("Camera information loaded successfully"))
+            self.root.after(0, lambda: self.status_var.set("Camera information loaded"))
             
         except Exception as e:
-            error_msg = f"Error loading camera information: {str(e)}"
+            error_msg = f"Error: {str(e)}"
             self.root.after(0, lambda: self.status_var.set(error_msg))
     
     def update_camera_dropdown(self):
@@ -415,18 +439,15 @@ class CameraInfoApp:
         self.camera_dropdown['values'] = []
         
         if not self.all_camera_info:
-            self.camera_dropdown['values'] = ["No cameras detected"]
+            self.camera_dropdown['values'] = ["No cameras"]
             self.camera_dropdown.current(0)
             return
         
         # Add camera entries to dropdown
         dropdown_values = []
         for i, cam in enumerate(self.all_camera_info):
-            model = cam.get('Model', 'Unknown Camera')
-            location = cam.get('Location', '')
+            model = cam.get('Model', 'Unknown')
             dropdown_text = f"Camera #{i+1}: {model}"
-            if location:
-                dropdown_text += f" ({location})"
             dropdown_values.append(dropdown_text)
         
         self.camera_dropdown['values'] = dropdown_values
