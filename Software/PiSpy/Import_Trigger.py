@@ -20,7 +20,7 @@ from Record import *
 from Day_Night_Mode import *
 import RPi.GPIO as GPIO
 from datetime import datetime
-from picamera import PiCamera
+from picamera2 import Picamera2 as PiCamera
 
 class Import_Trigger: #class for triggered recording
     

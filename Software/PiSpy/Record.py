@@ -17,15 +17,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from datetime import datetime
 from time import sleep
-from picamera import PiCamera
+from picamera2.encoders import H264Encoder
+from picamera2 import Picamera2 as PiCamera
 import RPi.GPIO as GPIO
 from Day_Night_Mode import *
-import os as os
 
 class Record:
 
     def start_record(self, ID, captureLength, resolution, framerate): #captures video, using settings based off which lights are on
         cam = PiCamera()
+        video_config = cam.create_video_configuration()
+        cam.configure(video_config)
+        encoder = H264Encoder(bitrate = 6000000)
         GPIO.setmode(GPIO.BCM) #set BCM GPIO numbering (how pins are referenced)
         GPIO.setwarnings(False) # disables warnings
         GPIO.setup(18,GPIO.OUT) #tells computer that GPIO pins used for red/white lights are outputs
@@ -41,15 +44,13 @@ class Record:
         time = datetime.now().strftime("%H:%M:%S") #sets variable for current time (to seconds)
         print("Recording began at " + time) #prints to monitor
         name = "/home/pi/Videos/{}".format(timestamp)
-        cam.start_recording(name + ".h264", bitrate = 6000000) #begins recording, saves to specified path with the timestamp as the format. to manually set the bitrate, replace 6000000 with selected value
+        cam.start_recording(encoder, name + ".h264") #begins recording, saves to specified path with the timestamp as the format. to manually set the bitrate, replace 6000000 with selected value
         cam.wait_recording(captureLength) #checks for exceptions- if error occurs the recording will stop, otherwise records for specified length
         cam.stop_recording() #ends the recording. If there is an error it will raise the exception
         time = datetime.now().strftime("%H:%M:%S") #sets variable for current time (to seconds)
         cam.stop_preview() #hides preview window
         rate = cam.framerate
         cam.close()
-        os.system("MP4Box -quiet -add //{name}.h264:fps={rate}  //{name}.mp4".format(name = name, rate = rate)) #converts to MP4 using MP4Box. If GPAC cannot be installed, remove this line
-        os.remove("//{name}.h264".format(name = name)) #removes .h264 file. If GPAC cannot be installed, remove this line
         print("Recording is finished!") #prints to monitor
 
 

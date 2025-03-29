@@ -20,26 +20,23 @@ from datetime import datetime
 from Time_Lists import *
 from Import_Trigger import *
 from Image import *
-from picamera import PiCamera
+from picamera2 import Picamera2 as PiCamera
+from picamera2 import Preview
 import sched
 import time as t
 
 class App:
-    
     def __init__(self, master, title):
         self.master = master
         self.master.title(title)
         self.master.maxsize(2000, 20000)
-        self.resolution = [1280, 720] #default resolution if none selected
+        self.resolution = [1536, 864] #default resolution if none selected
         self.framerate = 0 #must be reset if video mode selected
         self._setUpDisplay()
         self._takeAction()
         super(Time_Lists).__init__()
-
-
         
     def _takeAction(self):
-
         def enable_video(): #function to check if video box is checked
             if video.get() %2 != 0:#if video box is checked, enable video setting control
                 self.capture_box.config(state = NORMAL)
@@ -415,6 +412,8 @@ class App:
         
         def test_cam(): #test the camera//used for preview
             cam = PiCamera()
+            camera_config = cam.create_preview_configuration()
+            cam.configure(camera_config)
             if GPIO.input(14) == 1: #if red light is on, use night settings
                 if self.resolution == [3280,2464]:#3280x2464 doesnt work for preview so scales down to 1640x1232 which has same field of view
                     lights.camNight(cam, [1640,1232])
@@ -427,7 +426,8 @@ class App:
                     lights.camDay(cam, self.resolution)
             cam.preview_fullscreen=True #preview screen is not fullscreen
             cam.preview_window=(950, 220, 640, 480) #sets window size for window
-            cam.start_preview() #opens preview window
+            cam.start_preview(Preview.QTGL) #opens preview window
+            cam.start()
             if self.preview_length_box.get() != '':#if a preview length is specified
                 sleep(int(self.preview_length_box.get())) #camera sleeps for specified number of seconds
             else:#if no length specified, default is a 10 second preview

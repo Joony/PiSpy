@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from datetime import datetime
 from time import sleep
-from picamera import PiCamera
+from picamera2 import Picamera2 as PiCamera
 import RPi.GPIO as GPIO
 from Day_Night_Mode import *
 

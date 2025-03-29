@@ -16,12 +16,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
 from datetime import datetime
-from picamera import PiCamera
 from time import sleep
 from timeit import Timer
-from datetime import datetime
 import RPi.GPIO as GPIO
-
 
 class Day_Night:
 
