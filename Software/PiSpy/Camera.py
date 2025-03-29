@@ -6,12 +6,20 @@ from picamera2 import Picamera2
 class CameraInfoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Camera Information")
-        self.root.geometry("800x480")
+        self.root.title("Picamera2 Camera Information")
+        self.root.geometry("800x600")
+        
+        # Store camera information
+        self.all_camera_info = []
+        self.selected_camera_index = tk.StringVar()
         
         # Main frame
         self.main_frame = ttk.Frame(root, padding="10")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create header
+        header_label = ttk.Label(self.main_frame, text="Camera Information", font=("Arial", 16, "bold"))
+        header_label.pack(pady=10)
         
         # Create notebook (tabs)
         self.notebook = ttk.Notebook(self.main_frame)
@@ -26,8 +34,10 @@ class CameraInfoApp:
         self.notebook.add(self.sensor_modes_tab, text="Sensor Modes")
         self.notebook.add(self.config_tab, text="Configurations")
         
-        # Set up each tab with text widget and scrollbar
-        self.setup_text_with_scrollbar(self.camera_list_tab, "camera_list_text")
+        # Setup Camera List tab with dropdown
+        self.setup_camera_list_tab()
+        
+        # Set up other tabs with text widget and scrollbar
         self.setup_text_with_scrollbar(self.sensor_modes_tab, "sensor_modes_text")
         self.setup_text_with_scrollbar(self.config_tab, "config_text")
         
@@ -43,6 +53,39 @@ class CameraInfoApp:
         
         # Load camera info when app starts
         self.load_camera_info()
+    
+    def setup_camera_list_tab(self):
+        # Create a frame for the tab content
+        frame = ttk.Frame(self.camera_list_tab, padding="10")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create a frame for the dropdown
+        dropdown_frame = ttk.Frame(frame)
+        dropdown_frame.pack(fill=tk.X, expand=False, pady=(0, 10))
+        
+        # Create label
+        dropdown_label = ttk.Label(dropdown_frame, text="Select Camera:")
+        dropdown_label.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Create dropdown
+        self.camera_dropdown = ttk.Combobox(dropdown_frame, textvariable=self.selected_camera_index, state="readonly")
+        self.camera_dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.camera_dropdown.bind("<<ComboboxSelected>>", self.on_camera_selected)
+        
+        # Create a frame for the text widget
+        text_frame = ttk.Frame(frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create scrollbar
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Create text widget
+        self.camera_list_text = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set)
+        self.camera_list_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Configure scrollbar
+        scrollbar.config(command=self.camera_list_text.yview)
     
     def setup_text_with_scrollbar(self, parent, text_attr_name):
         # Create a frame to hold the text widget and scrollbar
@@ -63,6 +106,32 @@ class CameraInfoApp:
         # Store reference to text widget
         setattr(self, text_attr_name, text_widget)
     
+    def on_camera_selected(self, event=None):
+        try:
+            # Get the selected index
+            selected_index = self.camera_dropdown.current()
+            
+            if selected_index >= 0 and selected_index < len(self.all_camera_info):
+                # Clear the text widget
+                self.camera_list_text.delete(1.0, tk.END)
+                
+                # Display information for the selected camera
+                self.display_camera_info(self.all_camera_info[selected_index])
+        except Exception as e:
+            self.status_var.set(f"Error displaying camera info: {str(e)}")
+    
+    def display_camera_info(self, camera_info):
+        # Display camera details in the text widget
+        self.camera_list_text.insert(tk.END, f"Camera Details:\n\n")
+        self.camera_list_text.insert(tk.END, f"ID: {camera_info.get('Id', 'Unknown')}\n")
+        self.camera_list_text.insert(tk.END, f"Model: {camera_info.get('Model', 'Unknown')}\n")
+        self.camera_list_text.insert(tk.END, f"Location: {camera_info.get('Location', 'Unknown')}\n\n")
+        
+        # Display all other properties
+        self.camera_list_text.insert(tk.END, "All Properties:\n\n")
+        for key, value in camera_info.items():
+            self.camera_list_text.insert(tk.END, f"{key}: {value}\n")
+    
     def load_camera_info(self):
         self.status_var.set("Loading camera information...")
         # Run camera detection in a separate thread to prevent GUI freezing
@@ -74,6 +143,9 @@ class CameraInfoApp:
         self.sensor_modes_text.delete(1.0, tk.END)
         self.config_text.delete(1.0, tk.END)
         
+        # Reset camera info
+        self.all_camera_info = []
+        
         # Reload camera info
         self.load_camera_info()
     
@@ -83,10 +155,10 @@ class CameraInfoApp:
             picam2 = Picamera2()
             
             # Get camera information
-            camera_info = picam2.global_camera_info()
+            self.all_camera_info = picam2.global_camera_info()
             
-            # Update camera list text widget
-            self.root.after(0, lambda: self.update_camera_list(camera_info))
+            # Update camera dropdown
+            self.root.after(0, self.update_camera_dropdown)
             
             # Get sensor modes
             sensor_modes = picam2.sensor_modes
@@ -113,24 +185,33 @@ class CameraInfoApp:
             self.root.after(0, lambda: self.status_var.set(error_msg))
             self.root.after(0, lambda: self.camera_list_text.insert(tk.END, error_msg))
     
-    def update_camera_list(self, camera_info):
-        self.camera_list_text.insert(tk.END, "Available Cameras:\n\n")
-        if not camera_info:
+    def update_camera_dropdown(self):
+        # Clear the dropdown
+        self.camera_dropdown['values'] = []
+        
+        if not self.all_camera_info:
+            self.camera_dropdown['values'] = ["No cameras detected"]
+            self.camera_dropdown.current(0)
+            self.camera_list_text.delete(1.0, tk.END)
             self.camera_list_text.insert(tk.END, "No cameras detected")
             return
-            
-        for i, cam in enumerate(camera_info):
-            self.camera_list_text.insert(tk.END, f"Camera #{i+1}:\n")
-            self.camera_list_text.insert(tk.END, f"  ID: {cam.get('Id', 'Unknown')}\n")
-            self.camera_list_text.insert(tk.END, f"  Model: {cam.get('Model', 'Unknown')}\n")
-            self.camera_list_text.insert(tk.END, f"  Location: {cam.get('Location', 'Unknown')}\n")
-            
-            # Add other camera properties if available
-            for key, value in cam.items():
-                if key not in ['Id', 'Model', 'Location']:
-                    self.camera_list_text.insert(tk.END, f"  {key}: {value}\n")
-            
-            self.camera_list_text.insert(tk.END, "\n")
+        
+        # Add camera entries to dropdown
+        dropdown_values = []
+        for i, cam in enumerate(self.all_camera_info):
+            model = cam.get('Model', 'Unknown Camera')
+            location = cam.get('Location', '')
+            dropdown_text = f"Camera #{i+1}: {model}"
+            if location:
+                dropdown_text += f" ({location})"
+            dropdown_values.append(dropdown_text)
+        
+        self.camera_dropdown['values'] = dropdown_values
+        
+        # Select the first camera by default
+        if dropdown_values:
+            self.camera_dropdown.current(0)
+            self.on_camera_selected()
     
     def update_sensor_modes(self, sensor_modes):
         self.sensor_modes_text.insert(tk.END, "Available Sensor Modes:\n\n")
@@ -186,3 +267,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
