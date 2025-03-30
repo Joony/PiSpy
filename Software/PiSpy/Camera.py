@@ -769,11 +769,7 @@ class CameraInfoApp:
             # Extract mode index from dropdown text (Mode X: ...)
             mode_str = dropdown_value.split(":")[0].strip()
             mode_index = int(mode_str.split()[1]) - 1
-            
-            # Get the mode from picam2
-            sensor_modes = self.picam2.sensor_modes
-            if 0 <= mode_index < len(sensor_modes):
-                return sensor_modes[mode_index]
+            return mode_index
         except:
             pass
         
@@ -1432,7 +1428,7 @@ class CameraInfoApp:
         except Exception as e:
             self.status_var.set(f"Error recording video: {str(e)}")
             self.record_btn.config(state=tk.NORMAL)
-            
+
     def get_bitrate_from_quality(self):
         # Map quality levels to bitrates (in bps)
         quality_map = {
