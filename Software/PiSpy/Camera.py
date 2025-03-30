@@ -427,6 +427,145 @@ class CameraInfoApp:
         # Configure column weights
         output_frame.columnconfigure(1, weight=1)
         
+        # Image info
+        info_frame = ttk.LabelFrame(output_tab, text="Image Information")
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=2, padx=2)
+        
+        self.still_info_text = tk.Text(info_frame, wrap=tk.WORD, height=6)
+        self.still_info_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        self.still_info_text.insert(tk.END, "No images captured yet.")
+    
+    def setup_video_tab(self):
+        # Use a notebook inside the tab for better space organization
+        inner_notebook = ttk.Notebook(self.video_tab)
+        inner_notebook.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        
+        # Create sub-tabs
+        settings_tab = ttk.Frame(inner_notebook)
+        encoder_tab = ttk.Frame(inner_notebook)
+        output_tab = ttk.Frame(inner_notebook)
+        
+        inner_notebook.add(settings_tab, text="Settings")
+        inner_notebook.add(encoder_tab, text="Encoder")
+        inner_notebook.add(output_tab, text="Output")
+        
+        # Settings tab
+        # Sensor mode selection
+        sensor_frame = ttk.LabelFrame(settings_tab, text="Sensor Mode")
+        sensor_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        ttk.Label(sensor_frame, text="Mode:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_sensor_dropdown = ttk.Combobox(sensor_frame, textvariable=self.video_sensor_mode, state="readonly", width=30)
+        self.video_sensor_dropdown.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=2, pady=2)
+        self.video_sensor_dropdown.bind("<<ComboboxSelected>>", self.on_video_sensor_mode_changed)
+        
+        # Resolution section
+        res_frame = ttk.LabelFrame(settings_tab, text="Resolution")
+        res_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        # Grid layout for compactness
+        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_res_dropdown = ttk.Combobox(res_frame, textvariable=self.video_resolution, state="readonly", width=15)
+        self.video_res_dropdown.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=2, pady=2)
+        self.video_res_dropdown.bind("<<ComboboxSelected>>", self.on_video_resolution_changed)
+        
+        # Framerate
+        ttk.Label(res_frame, text="Framerate:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        self.framerate_entry = ttk.Entry(res_frame, textvariable=self.video_framerate, width=5)
+        self.framerate_entry.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(res_frame, text="fps").grid(row=1, column=2, sticky=tk.W, padx=2, pady=2)
+        
+        # Custom resolution
+        ttk.Label(res_frame, text="Custom:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        
+        custom_frame = ttk.Frame(res_frame)
+        custom_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        ttk.Label(custom_frame, text="W:").pack(side=tk.LEFT)
+        self.video_width_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_width, width=5, state="disabled")
+        self.video_width_entry.pack(side=tk.LEFT, padx=(0, 2))
+        
+        ttk.Label(custom_frame, text="H:").pack(side=tk.LEFT)
+        self.video_height_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_height, width=5, state="disabled")
+        self.video_height_entry.pack(side=tk.LEFT)
+        
+        # Apply custom button
+        self.video_apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_video_resolution, width=6, state="disabled")
+        self.video_apply_custom_btn.grid(row=2, column=2, padx=2, pady=2)
+        
+        # Actions for video
+        actions_frame = ttk.LabelFrame(settings_tab, text="Actions")
+        actions_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        # Use grid for buttons to place them horizontally
+        preview_btn = ttk.Button(actions_frame, text="Preview (10s)", command=lambda: self.start_preview("video"))
+        preview_btn.grid(row=0, column=0, padx=2, pady=2, sticky=(tk.W, tk.E))
+        
+        self.record_btn = ttk.Button(actions_frame, text="Record Video", command=self.record_video)
+        self.record_btn.grid(row=0, column=1, padx=2, pady=2, sticky=(tk.W, tk.E))
+        
+        # Configure grid weights
+        actions_frame.columnconfigure(0, weight=1)
+        actions_frame.columnconfigure(1, weight=1)
+        
+        # Encoder tab
+        # Encoder settings
+        encoder_frame = ttk.LabelFrame(encoder_tab, text="Encoder Settings")
+        encoder_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        # Encoder selection
+        ttk.Label(encoder_frame, text="Encoder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        encoder_combo = ttk.Combobox(encoder_frame, textvariable=self.video_encoder, 
+                                    values=["H264Encoder", "MJPEGEncoder"], state="readonly", width=12)
+        encoder_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Format selection
+        ttk.Label(encoder_frame, text="Format:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        format_combo = ttk.Combobox(encoder_frame, textvariable=self.video_format, 
+                                values=[".mp4", ".mkv", ".avi", ".h264", ".mjpg"], state="readonly", width=6)
+        format_combo.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        format_combo.bind("<<ComboboxSelected>>", self.on_format_changed)
+        
+        # Quality selection
+        ttk.Label(encoder_frame, text="Quality:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_quality_var = tk.StringVar(value="High")
+        quality_combo = ttk.Combobox(encoder_frame, textvariable=self.video_quality_var, 
+                                    values=["Very Low", "Low", "Medium", "High", "Very High"], state="readonly", width=10)
+        quality_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Recording duration
+        ttk.Label(encoder_frame, text="Duration:").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
+        duration_frame = ttk.Frame(encoder_frame)
+        duration_frame.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        self.video_duration_var = tk.StringVar(value="10")
+        duration_entry = ttk.Entry(duration_frame, textvariable=self.video_duration_var, width=5)
+        duration_entry.pack(side=tk.LEFT)
+        ttk.Label(duration_frame, text="sec").pack(side=tk.LEFT, padx=2)
+        
+        # Output tab
+        # Output settings
+        output_frame = ttk.LabelFrame(output_tab, text="Output Settings")
+        output_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        # Save folder
+        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_dir_var = tk.StringVar(value=self.video_dir)
+        dir_entry = ttk.Entry(output_frame, textvariable=self.video_dir_var)
+        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        browse_btn = ttk.Button(output_frame, text="...", command=lambda: self.browse_directory("video"), width=3)
+        browse_btn.grid(row=0, column=2, padx=2, pady=2)
+        
+        # Filename prefix
+        ttk.Label(output_frame, text="Prefix:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        self.video_prefix_var = tk.StringVar(value="video_")
+        prefix_entry = ttk.Entry(output_frame, textvariable=self.video_prefix_var)
+        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
+        
+        # Configure column weights
+        output_frame.columnconfigure(1, weight=1)
+        
         # Video info
         info_frame = ttk.LabelFrame(output_tab, text="Video Information")
         info_frame.pack(fill=tk.BOTH, expand=True, pady=2, padx=2)
@@ -1293,7 +1432,7 @@ class CameraInfoApp:
         except Exception as e:
             self.status_var.set(f"Error recording video: {str(e)}")
             self.record_btn.config(state=tk.NORMAL)
-    
+            
     def get_bitrate_from_quality(self):
         # Map quality levels to bitrates (in bps)
         quality_map = {
