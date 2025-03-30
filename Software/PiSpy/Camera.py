@@ -4,12 +4,14 @@ import threading
 import time
 import os
 import json
+import shutil
+import subprocess
 from datetime import datetime
 from PIL import Image, ImageTk
 import numpy as np
 from picamera2 import Picamera2
 from picamera2.encoders import H264Encoder, MJPEGEncoder, Quality
-from picamera2.outputs import FileOutput
+from picamera2.outputs import FileOutput, FfmpegOutput
 
 class PreviewWindow:
     def __init__(self, root, picam2, stop_event, duration=10):
@@ -203,6 +205,35 @@ class CameraInfoApp:
         
         # Load camera info when app starts
         self.load_camera_info()
+
+        # Check FFmpeg availability
+        self.ffmpeg_available = self.check_ffmpeg_available()
+        if not self.ffmpeg_available:
+            messagebox.showwarning("FFmpeg Not Found",
+                                "FFmpeg was not detected on your system. "
+                                "Container formats like MP4 may not work correctly.\n\n"
+                                "For best results, please install FFmpeg.")
+    
+    def check_ffmpeg_available(self):
+        """
+        Checks if FFmpeg is available on the system.
+        Returns True if available, False otherwise.
+        """
+        # First check using shutil.which
+        if shutil.which("ffmpeg"):
+            return True
+        
+        # If not found via PATH, try running ffmpeg directly to check
+        try:
+            result = subprocess.run(["ffmpeg", "-version"], 
+                                stdout=subprocess.PIPE, 
+                                stderr=subprocess.PIPE,
+                                timeout=1)
+            return result.returncode == 0
+        except:
+            return False
+        
+        return False
     
     def create_ui(self):
         # Main frame
@@ -249,7 +280,7 @@ class CameraInfoApp:
             header_frame, 
             textvariable=self.selected_camera_index, 
             state="readonly",
-            width=20  # Shorter width
+            width=30
         )
         self.camera_dropdown.pack(side=tk.LEFT, padx=2)
         self.camera_dropdown.bind("<<ComboboxSelected>>", self.on_camera_selected)
@@ -469,8 +500,9 @@ class CameraInfoApp:
         # Format selection
         ttk.Label(encoder_frame, text="Format:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
         format_combo = ttk.Combobox(encoder_frame, textvariable=self.video_format, 
-                                   values=[".mp4", ".h264", ".mjpg"], state="readonly", width=6)
+                                values=[".mp4", ".mkv", ".avi", ".h264", ".mjpg"], state="readonly", width=6)
         format_combo.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        format_combo.bind("<<ComboboxSelected>>", self.on_format_changed)
         
         # Quality selection
         ttk.Label(encoder_frame, text="Quality:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
@@ -861,6 +893,27 @@ class CameraInfoApp:
         # Monitor preview window closure
         self.root.after(100, self.check_preview_window)
     
+    def on_format_changed(self, event=None):
+        # Ensure encoder and format combinations make sense
+        format_val = self.video_format.get()
+        encoder_val = self.video_encoder.get()
+        
+        # Check for incompatible combinations
+        if format_val == ".mjpg" and encoder_val != "MJPEGEncoder":
+            self.video_encoder.set("MJPEGEncoder")
+            messagebox.showinfo("Format Changed", "MJPG format requires MJPEGEncoder. Encoder has been updated.")
+        
+        elif format_val == ".h264" and encoder_val != "H264Encoder":
+            self.video_encoder.set("H264Encoder")
+            messagebox.showinfo("Format Changed", "H264 format requires H264Encoder. Encoder has been updated.")
+        
+        # If container format selected, provide info about FFmpeg output
+        if format_val in [".mp4", ".mkv", ".avi"]:
+            if not self.check_ffmpeg_available():
+                messagebox.showwarning("FFmpeg Required", 
+                                    "Container formats like MP4, MKV, and AVI require FFmpeg.\n"
+                                    "Make sure FFmpeg is installed on your system.")
+    
     def check_preview_window(self):
         # Check if preview window is still open
         if self.preview_window and not self.preview_window.root.winfo_exists():
@@ -991,11 +1044,20 @@ class CameraInfoApp:
             filename = f"{self.video_prefix_var.get()}{timestamp}{self.video_format.get()}"
             filepath = os.path.join(self.video_dir_var.get(), filename)
             
-            # Create encoder
+            # Create encoder based on selection
             if self.video_encoder.get() == "H264Encoder":
                 encoder = H264Encoder(bitrate=self.get_bitrate_from_quality())
             else:
                 encoder = MJPEGEncoder()
+            
+            # Create appropriate output based on format
+            format_extension = self.video_format.get()
+            if format_extension in [".mp4", ".mkv", ".avi"] and self.video_encoder.get() == "H264Encoder":
+                # Use FfmpegOutput for container formats
+                output = FfmpegOutput(filepath)
+            else:
+                # Use standard FileOutput for raw streams
+                output = FileOutput(filepath)
             
             # Set status
             self.status_var.set(f"Recording video for {duration} seconds...")
@@ -1004,7 +1066,7 @@ class CameraInfoApp:
             self.record_btn.config(state=tk.DISABLED)
             
             # Start recording
-            self.picam2.start_recording(encoder, filepath)
+            self.picam2.start_recording(encoder, output)
             
             # Wait for specified duration
             time.sleep(duration)
@@ -1030,6 +1092,13 @@ class CameraInfoApp:
             self.video_info_text.insert(tk.END, f"Duration: {duration}s\n")
             self.video_info_text.insert(tk.END, f"Encoder: {self.video_encoder.get()}\n")
             self.video_info_text.insert(tk.END, f"Format: {self.video_format.get()[1:]}\n")
+            
+            # Add info about the output type
+            if isinstance(output, FfmpegOutput):
+                self.video_info_text.insert(tk.END, f"Container: FFmpeg {self.video_format.get()[1:]} container\n")
+            else:
+                self.video_info_text.insert(tk.END, f"Container: Raw bitstream\n")
+                
             self.video_info_text.insert(tk.END, f"Saved to: {self.video_dir_var.get()}\n")
             self.video_info_text.insert(tk.END, f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             
