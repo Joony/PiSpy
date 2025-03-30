@@ -11,6 +11,138 @@ from picamera2 import Picamera2
 from picamera2.encoders import H264Encoder, MJPEGEncoder, Quality
 from picamera2.outputs import FileOutput
 
+class PreviewWindow:
+    def __init__(self, root, picam2, stop_event, duration=10):
+        self.root = root
+        self.picam2 = picam2
+        self.stop_event = stop_event
+        self.duration = duration
+        
+        # Set window properties
+        self.root.title("Camera Preview")
+        self.root.geometry("640x480")
+        
+        # Create canvas for preview
+        self.canvas = tk.Canvas(self.root, bg="black")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Add close button
+        self.close_btn = ttk.Button(self.root, text="Close Preview", command=self.close)
+        self.close_btn.pack(pady=5)
+        
+        # Info label
+        self.info_var = tk.StringVar(value="Starting preview...")
+        self.info_label = ttk.Label(self.root, textvariable=self.info_var)
+        self.info_label.pack(pady=5)
+        
+        # Handle window close
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        
+        # Start the preview thread
+        self.preview_thread = threading.Thread(target=self.run_preview)
+        self.preview_thread.daemon = True
+        self.preview_thread.start()
+    
+    def run_preview(self):
+        try:
+            # Update info
+            self.root.after(0, lambda: self.info_var.set("Preview starting..."))
+            
+            # Start camera
+            self.picam2.start()
+            
+            # Get canvas dimensions
+            canvas_width = self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+            
+            start_time = time.time()
+            frame_count = 0
+            
+            # Run preview loop
+            while not self.stop_event.is_set() and time.time() - start_time < self.duration:
+                # Capture frame
+                frame = self.picam2.capture_array()
+                
+                # Convert to PIL Image
+                img = Image.fromarray(frame)
+                
+                # Get current canvas dimensions (may have changed if window was resized)
+                current_width = self.canvas.winfo_width()
+                current_height = self.canvas.winfo_height()
+                
+                if current_width > 1 and current_height > 1:  # Make sure canvas has been drawn
+                    # Resize to fit canvas (maintaining aspect ratio)
+                    img_width, img_height = img.size
+                    scale = min(current_width/img_width, current_height/img_height)
+                    new_width = int(img_width * scale)
+                    new_height = int(img_height * scale)
+                    img = img.resize((new_width, new_height), Image.LANCZOS)
+                    
+                    # Convert to Tkinter PhotoImage
+                    photo = ImageTk.PhotoImage(image=img)
+                    
+                    # Update canvas
+                    self.root.after(0, lambda p=photo, w=new_width, h=new_height: self.update_canvas(p, w, h))
+                
+                # Update preview info
+                remaining = self.duration - (time.time() - start_time)
+                if remaining > 0:
+                    self.root.after(0, lambda r=remaining: self.info_var.set(f"Preview active ({r:.1f}s remaining)"))
+                
+                # Increment frame count
+                frame_count += 1
+                
+                # Sleep to limit CPU usage
+                time.sleep(0.033)  # ~30fps
+            
+            # Calculate actual FPS
+            elapsed = time.time() - start_time
+            fps = frame_count / elapsed if elapsed > 0 else 0
+            
+            # Update info with FPS
+            self.root.after(0, lambda: self.info_var.set(f"Preview ended. Average FPS: {fps:.1f}"))
+            
+            # Check if window still exists before trying to close it automatically
+            if self.root.winfo_exists():
+                # Close window after a short delay if time expired (not if manually closed)
+                if not self.stop_event.is_set() and time.time() - start_time >= self.duration:
+                    self.root.after(2000, self.close)
+        
+        except Exception as e:
+            # Show error in preview window
+            self.root.after(0, lambda: self.info_var.set(f"Preview error: {str(e)}"))
+        finally:
+            # Make sure we stop the camera only if we're the one who started it
+            try:
+                self.picam2.stop()
+            except:
+                pass
+    
+    def update_canvas(self, photo, width, height):
+        # Store reference to photo to prevent garbage collection
+        self.photo = photo
+        
+        # Get canvas dimensions
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # Calculate position to center the image
+        x = (canvas_width - width) // 2
+        y = (canvas_height - height) // 2
+        
+        # Clear previous image
+        self.canvas.delete("all")
+        
+        # Create new image
+        self.canvas.create_image(x, y, anchor=tk.NW, image=photo)
+    
+    def close(self):
+        # Signal the thread to stop
+        self.stop_event.set()
+        
+        # Close the window
+        self.root.destroy()
+
 class CameraInfoApp:
     def __init__(self, root):
         self.root = root
@@ -38,7 +170,7 @@ class CameraInfoApp:
         
         # Preview variables
         self.preview_active = False
-        self.preview_thread = None
+        self.preview_window = None
         self.stop_preview_event = threading.Event()
         
         # Video variables
@@ -97,21 +229,6 @@ class CameraInfoApp:
         self.setup_camera_info_tab()
         self.setup_still_tab()
         self.setup_video_tab()
-        
-        # Setup preview frame
-        self.preview_frame = ttk.LabelFrame(self.main_frame, text="Preview")
-        self.preview_frame.pack(fill=tk.BOTH, expand=True, pady=2)
-        
-        # Preview canvas (make it short to accommodate other controls)
-        self.preview_canvas = tk.Canvas(self.preview_frame, bg="black", height=180)
-        self.preview_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Close preview button (initially hidden)
-        self.close_preview_btn = ttk.Button(
-            self.preview_frame, 
-            text="Close Preview", 
-            command=self.stop_preview
-        )
         
         # Status bar
         self.status_var = tk.StringVar()
@@ -403,8 +520,6 @@ class CameraInfoApp:
         self.video_info_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         self.video_info_text.insert(tk.END, "No videos recorded yet.")
     
-    # The rest of the methods remain the same as in the previous implementation
-    
     def initialize_camera(self):
         try:
             if self.picam2 is not None:
@@ -677,17 +792,10 @@ class CameraInfoApp:
             self.save_camera_configuration()
     
     def start_preview(self, mode):
+        # Stop any existing preview
         if self.preview_active:
             messagebox.showinfo("Preview Active", "A preview is already running. Please close it first.")
             return
-        
-        # Stop any active preview
-        self.stop_preview_event.set()
-        if self.preview_thread and self.preview_thread.is_alive():
-            self.preview_thread.join(1.0)
-        
-        # Reset stop event
-        self.stop_preview_event.clear()
         
         # Configure preview based on mode
         if mode == "video":
@@ -707,10 +815,8 @@ class CameraInfoApp:
                     return
             
             # Create video configuration
-            self.preview_config = self.picam2.create_video_configuration(
-                main={"size": (width, height), "format": "RGB888"},
-                lores={"size": (640, 480), "format": "YUV420"},
-                display="lores"
+            preview_config = self.picam2.create_video_configuration(
+                main={"size": (width, height), "format": "RGB888"}
             )
             
         else:  # still mode
@@ -730,118 +836,41 @@ class CameraInfoApp:
                     return
             
             # Create still configuration
-            self.preview_config = self.picam2.create_still_configuration(
-                main={"size": (width, height), "format": "RGB888"},
-                lores={"size": (640, 480), "format": "YUV420"},
-                display="lores"
+            preview_config = self.picam2.create_still_configuration(
+                main={"size": (width, height), "format": "RGB888"}
             )
         
-        # Start preview thread
-        self.preview_thread = threading.Thread(target=self.run_preview, args=(10,))
-        self.preview_thread.daemon = True
-        self.preview_thread.start()
+        # Configure camera
+        self.picam2.configure(preview_config)
         
-        # Show close button
-        self.close_preview_btn.pack(pady=5)
+        # Reset stop event
+        self.stop_preview_event.clear()
+        
+        # Create new preview window
+        preview_window = tk.Toplevel(self.root)
+        self.preview_window = PreviewWindow(
+            preview_window, 
+            self.picam2, 
+            self.stop_preview_event,
+            duration=10
+        )
+        
+        # Mark preview as active
+        self.preview_active = True
+        
+        # Monitor preview window closure
+        self.root.after(100, self.check_preview_window)
     
-    def run_preview(self, duration):
-        try:
-            # Set status
-            self.status_var.set("Starting preview...")
-            self.preview_active = True
-            
-            # Configure and start camera
-            self.picam2.configure(self.preview_config)
-            self.picam2.start()
-            
-            # Update status
-            self.root.after(0, lambda: self.status_var.set(f"Preview active ({duration}s)..."))
-            
-            # Get preview dimensions
-            canvas_width = self.preview_canvas.winfo_width()
-            canvas_height = self.preview_canvas.winfo_height()
-            
-            start_time = time.time()
-            frame_count = 0
-            
-            # Run preview loop
-            while not self.stop_preview_event.is_set() and time.time() - start_time < duration:
-                # Capture frame
-                frame = self.picam2.capture_array("lores")
-                
-                # Convert to RGB if needed (assuming YUV420)
-                if len(frame.shape) == 3 and frame.shape[2] == 3:
-                    # Already RGB
-                    rgb_frame = frame
-                else:
-                    # Need to convert from YUV
-                    height, width = frame.shape[0], frame.shape[1]
-                    rgb_frame = np.zeros((height, width, 3), dtype=np.uint8)
-                    # This is simplified; actual YUV420 to RGB conversion is more complex
-                    rgb_frame[:, :, 0] = frame[:, :, 0]  # Just using Y channel for all RGB values
-                    rgb_frame[:, :, 1] = frame[:, :, 0]
-                    rgb_frame[:, :, 2] = frame[:, :, 0]
-                
-                # Convert to PIL Image
-                img = Image.fromarray(rgb_frame)
-                
-                # Resize to fit canvas (maintaining aspect ratio)
-                img_width, img_height = img.size
-                scale = min(canvas_width/img_width, canvas_height/img_height)
-                new_width = int(img_width * scale)
-                new_height = int(img_height * scale)
-                img = img.resize((new_width, new_height), Image.LANCZOS)
-                
-                # Convert to Tkinter PhotoImage
-                photo = ImageTk.PhotoImage(image=img)
-                
-                # Update canvas
-                self.root.after(0, lambda p=photo: self.update_preview_canvas(p, new_width, new_height))
-                
-                # Increment frame count
-                frame_count += 1
-                
-                # Sleep to limit CPU usage
-                time.sleep(0.033)  # ~30fps
-            
-            # Calculate actual FPS
-            elapsed = time.time() - start_time
-            fps = frame_count / elapsed if elapsed > 0 else 0
-            
-            # Stop the camera
-            self.picam2.stop()
-            
-            # Update status
-            self.root.after(0, lambda: self.status_var.set(f"Preview ended. Average FPS: {fps:.1f}"))
-            
-        except Exception as e:
-            self.root.after(0, lambda: self.status_var.set(f"Preview error: {str(e)}"))
-        finally:
+    def check_preview_window(self):
+        # Check if preview window is still open
+        if self.preview_window and not self.preview_window.root.winfo_exists():
             self.preview_active = False
-            self.root.after(0, lambda: self.close_preview_btn.pack_forget())
-    
-    def update_preview_canvas(self, photo, width, height):
-        # Store reference to photo to prevent garbage collection
-        self.preview_photo = photo
+            self.preview_window = None
+            return
         
-        # Get canvas dimensions
-        canvas_width = self.preview_canvas.winfo_width()
-        canvas_height = self.preview_canvas.winfo_height()
-        
-        # Calculate position to center the image
-        x = (canvas_width - width) // 2
-        y = (canvas_height - height) // 2
-        
-        # Clear previous image
-        self.preview_canvas.delete("all")
-        
-        # Create new image
-        self.preview_canvas.create_image(x, y, anchor=tk.NW, image=photo)
-    
-    def stop_preview(self):
+        # Otherwise continue checking
         if self.preview_active:
-            self.stop_preview_event.set()
-            self.status_var.set("Stopping preview...")
+            self.root.after(100, self.check_preview_window)
     
     def capture_photo(self):
         try:
