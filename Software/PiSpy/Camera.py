@@ -188,6 +188,10 @@ class CameraInfoApp:
         self.still_custom_width = tk.StringVar(value="3280")
         self.still_custom_height = tk.StringVar(value="2464")
         
+        # Sensor mode variables 
+        self.video_sensor_mode = tk.StringVar(value="Auto")
+        self.still_sensor_mode = tk.StringVar(value="Auto")
+        
         # Use a more compact style for small screens
         self.style = ttk.Style()
         self.style.configure('TButton', padding=2)
@@ -342,6 +346,15 @@ class CameraInfoApp:
         inner_notebook.add(output_tab, text="Output")
         
         # Settings tab
+        # Sensor mode selection
+        sensor_frame = ttk.LabelFrame(settings_tab, text="Sensor Mode")
+        sensor_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
+        
+        ttk.Label(sensor_frame, text="Mode:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        self.still_sensor_dropdown = ttk.Combobox(sensor_frame, textvariable=self.still_sensor_mode, state="readonly", width=30)
+        self.still_sensor_dropdown.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=2, pady=2)
+        self.still_sensor_dropdown.bind("<<ComboboxSelected>>", self.on_still_sensor_mode_changed)
+        
         # Resolution section
         res_frame = ttk.LabelFrame(settings_tab, text="Resolution")
         res_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
@@ -359,16 +372,16 @@ class CameraInfoApp:
         custom_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
         
         ttk.Label(custom_frame, text="W:").pack(side=tk.LEFT)
-        width_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_width, width=5)
-        width_entry.pack(side=tk.LEFT, padx=(0, 2))
+        self.still_width_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_width, width=5, state="disabled")
+        self.still_width_entry.pack(side=tk.LEFT, padx=(0, 2))
         
         ttk.Label(custom_frame, text="H:").pack(side=tk.LEFT)
-        height_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_height, width=5)
-        height_entry.pack(side=tk.LEFT)
+        self.still_height_entry = ttk.Entry(custom_frame, textvariable=self.still_custom_height, width=5, state="disabled")
+        self.still_height_entry.pack(side=tk.LEFT)
         
         # Apply custom button
-        apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_still_resolution, width=6)
-        apply_custom_btn.grid(row=1, column=2, padx=2, pady=2)
+        self.still_apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_still_resolution, width=6, state="disabled")
+        self.still_apply_custom_btn.grid(row=1, column=2, padx=2, pady=2)
         
         # Format selection
         ttk.Label(res_frame, text="Format:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
@@ -409,136 +422,6 @@ class CameraInfoApp:
         ttk.Label(output_frame, text="Prefix:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
         self.still_prefix_var = tk.StringVar(value="photo_")
         prefix_entry = ttk.Entry(output_frame, textvariable=self.still_prefix_var)
-        prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        # Configure column weights
-        output_frame.columnconfigure(1, weight=1)
-        
-        # Image info
-        info_frame = ttk.LabelFrame(output_tab, text="Image Information")
-        info_frame.pack(fill=tk.BOTH, expand=True, pady=2, padx=2)
-        
-        self.still_info_text = tk.Text(info_frame, wrap=tk.WORD, height=6)
-        self.still_info_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-        self.still_info_text.insert(tk.END, "No images captured yet.")
-    
-    def setup_video_tab(self):
-        # Use a notebook inside the tab for better space organization
-        inner_notebook = ttk.Notebook(self.video_tab)
-        inner_notebook.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-        
-        # Create sub-tabs
-        settings_tab = ttk.Frame(inner_notebook)
-        encoder_tab = ttk.Frame(inner_notebook)
-        output_tab = ttk.Frame(inner_notebook)
-        
-        inner_notebook.add(settings_tab, text="Settings")
-        inner_notebook.add(encoder_tab, text="Encoder")
-        inner_notebook.add(output_tab, text="Output")
-        
-        # Settings tab
-        # Resolution section
-        res_frame = ttk.LabelFrame(settings_tab, text="Resolution")
-        res_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
-        
-        # Grid layout for compactness
-        ttk.Label(res_frame, text="Resolution:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        self.video_res_dropdown = ttk.Combobox(res_frame, textvariable=self.video_resolution, state="readonly", width=15)
-        self.video_res_dropdown.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=2, pady=2)
-        self.video_res_dropdown.bind("<<ComboboxSelected>>", self.on_video_resolution_changed)
-        
-        # Framerate
-        ttk.Label(res_frame, text="Framerate:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
-        framerate_entry = ttk.Entry(res_frame, textvariable=self.video_framerate, width=5)
-        framerate_entry.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
-        ttk.Label(res_frame, text="fps").grid(row=1, column=2, sticky=tk.W, padx=2, pady=2)
-        
-        # Custom resolution
-        ttk.Label(res_frame, text="Custom:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        
-        custom_frame = ttk.Frame(res_frame)
-        custom_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        ttk.Label(custom_frame, text="W:").pack(side=tk.LEFT)
-        width_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_width, width=5)
-        width_entry.pack(side=tk.LEFT, padx=(0, 2))
-        
-        ttk.Label(custom_frame, text="H:").pack(side=tk.LEFT)
-        height_entry = ttk.Entry(custom_frame, textvariable=self.video_custom_height, width=5)
-        height_entry.pack(side=tk.LEFT)
-        
-        # Apply custom button
-        apply_custom_btn = ttk.Button(res_frame, text="Apply", command=self.apply_custom_video_resolution, width=6)
-        apply_custom_btn.grid(row=2, column=2, padx=2, pady=2)
-        
-        # Actions for video
-        actions_frame = ttk.LabelFrame(settings_tab, text="Actions")
-        actions_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
-        
-        # Use grid for buttons to place them horizontally
-        preview_btn = ttk.Button(actions_frame, text="Preview (10s)", command=lambda: self.start_preview("video"))
-        preview_btn.grid(row=0, column=0, padx=2, pady=2, sticky=(tk.W, tk.E))
-        
-        self.record_btn = ttk.Button(actions_frame, text="Record Video", command=self.record_video)
-        self.record_btn.grid(row=0, column=1, padx=2, pady=2, sticky=(tk.W, tk.E))
-        
-        # Configure grid weights
-        actions_frame.columnconfigure(0, weight=1)
-        actions_frame.columnconfigure(1, weight=1)
-        
-        # Encoder tab
-        # Encoder settings
-        encoder_frame = ttk.LabelFrame(encoder_tab, text="Encoder Settings")
-        encoder_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
-        
-        # Encoder selection
-        ttk.Label(encoder_frame, text="Encoder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        encoder_combo = ttk.Combobox(encoder_frame, textvariable=self.video_encoder, 
-                                    values=["H264Encoder", "MJPEGEncoder"], state="readonly", width=12)
-        encoder_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        # Format selection
-        ttk.Label(encoder_frame, text="Format:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
-        format_combo = ttk.Combobox(encoder_frame, textvariable=self.video_format, 
-                                values=[".mp4", ".mkv", ".avi", ".h264", ".mjpg"], state="readonly", width=6)
-        format_combo.grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
-        format_combo.bind("<<ComboboxSelected>>", self.on_format_changed)
-        
-        # Quality selection
-        ttk.Label(encoder_frame, text="Quality:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        self.video_quality_var = tk.StringVar(value="High")
-        quality_combo = ttk.Combobox(encoder_frame, textvariable=self.video_quality_var, 
-                                    values=["Very Low", "Low", "Medium", "High", "Very High"], state="readonly", width=10)
-        quality_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        # Recording duration
-        ttk.Label(encoder_frame, text="Duration:").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
-        duration_frame = ttk.Frame(encoder_frame)
-        duration_frame.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        self.video_duration_var = tk.StringVar(value="10")
-        duration_entry = ttk.Entry(duration_frame, textvariable=self.video_duration_var, width=5)
-        duration_entry.pack(side=tk.LEFT)
-        ttk.Label(duration_frame, text="sec").pack(side=tk.LEFT, padx=2)
-        
-        # Output tab
-        # Output settings
-        output_frame = ttk.LabelFrame(output_tab, text="Output Settings")
-        output_frame.pack(fill=tk.X, expand=False, pady=2, padx=2)
-        
-        # Save folder
-        ttk.Label(output_frame, text="Save folder:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        self.video_dir_var = tk.StringVar(value=self.video_dir)
-        dir_entry = ttk.Entry(output_frame, textvariable=self.video_dir_var)
-        dir_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
-        
-        browse_btn = ttk.Button(output_frame, text="...", command=lambda: self.browse_directory("video"), width=3)
-        browse_btn.grid(row=0, column=2, padx=2, pady=2)
-        
-        # Filename prefix
-        ttk.Label(output_frame, text="Prefix:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
-        self.video_prefix_var = tk.StringVar(value="video_")
-        prefix_entry = ttk.Entry(output_frame, textvariable=self.video_prefix_var)
         prefix_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=2, pady=2)
         
         # Configure column weights
@@ -628,8 +511,12 @@ class CameraInfoApp:
                 # Update sensor modes
                 self.update_sensor_modes()
                 
-                # Update resolution options in video and still tabs
-                self.update_resolution_options()
+                # Update sensor mode dropdowns
+                self.update_sensor_mode_options()
+                
+                # Reset resolution options to match the current sensor mode
+                self.on_video_sensor_mode_changed()
+                self.on_still_sensor_mode_changed()
                 
                 # Update status
                 self.status_var.set(f"Camera '{camera_info.get('Model', 'Unknown')}' selected")
@@ -674,15 +561,160 @@ class CameraInfoApp:
                 if 'format' in mode:
                     self.sensor_modes_text.insert(tk.END, f"  Format: {mode['format']}\n")
                 
+                # Display frame rate if available
+                if 'fps' in mode:
+                    self.sensor_modes_text.insert(tk.END, f"  Frame rate: {mode['fps']} fps\n")
+                
+                # Display crop rectangle if available
+                if 'crop_rectangle' in mode:
+                    self.sensor_modes_text.insert(tk.END, f"  Crop: {mode['crop_rectangle']}\n")
+                
+                # Display bit depth if available
+                if 'bit_depth' in mode:
+                    self.sensor_modes_text.insert(tk.END, f"  Bit depth: {mode['bit_depth']}\n")
+                
                 # Display other properties
                 for key, value in mode.items():
-                    if key not in ['size', 'format']:
+                    if key not in ['size', 'format', 'fps', 'crop_rectangle', 'bit_depth']:
                         self.sensor_modes_text.insert(tk.END, f"  {key}: {value}\n")
                 
                 self.sensor_modes_text.insert(tk.END, "\n")
         
         except Exception as e:
             self.sensor_modes_text.insert(tk.END, f"Error retrieving sensor modes: {str(e)}")
+    
+    def update_sensor_mode_options(self):
+        try:
+            # Get sensor modes
+            sensor_modes = self.picam2.sensor_modes
+            
+            if not sensor_modes:
+                self.video_sensor_dropdown['values'] = ["Auto"]
+                self.still_sensor_dropdown['values'] = ["Auto"]
+                self.video_sensor_mode.set("Auto")
+                self.still_sensor_mode.set("Auto")
+                return
+            
+            # Build the list of mode options
+            mode_options = ["Auto"]  # Default option
+            
+            for i, mode in enumerate(sensor_modes):
+                # Create descriptive text for each mode
+                width, height = mode.get('size', (0, 0))
+                fps = mode.get('fps', 'N/A')
+                format_str = mode.get('format', 'N/A')
+                
+                mode_text = f"Mode {i+1}: {width}x{height}, {fps} fps, {format_str}"
+                mode_options.append(mode_text)
+            
+            # Update the dropdowns
+            self.video_sensor_dropdown['values'] = mode_options
+            self.still_sensor_dropdown['values'] = mode_options
+            
+            # Set to Auto by default
+            if self.video_sensor_mode.get() not in mode_options:
+                self.video_sensor_mode.set("Auto")
+            
+            if self.still_sensor_mode.get() not in mode_options:
+                self.still_sensor_mode.set("Auto")
+                
+        except Exception as e:
+            self.status_var.set(f"Error updating sensor mode options: {str(e)}")
+    
+    def get_selected_sensor_mode(self, dropdown_value):
+        """Get the sensor mode object based on dropdown selection"""
+        if dropdown_value == "Auto" or not dropdown_value:
+            return None
+        
+        try:
+            # Extract mode index from dropdown text (Mode X: ...)
+            mode_str = dropdown_value.split(":")[0].strip()
+            mode_index = int(mode_str.split()[1]) - 1
+            
+            # Get the mode from picam2
+            sensor_modes = self.picam2.sensor_modes
+            if 0 <= mode_index < len(sensor_modes):
+                return sensor_modes[mode_index]
+        except:
+            pass
+        
+        return None
+    
+    def on_video_sensor_mode_changed(self, event=None):
+        """Update resolution and framerate options based on selected sensor mode"""
+        try:
+            # Get the selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.video_sensor_mode.get())
+            
+            if selected_mode:
+                # Get resolution from the mode
+                width, height = selected_mode.get('size', (1280, 720))
+                
+                # Get max framerate
+                max_fps = selected_mode.get('fps', 30)
+                
+                # Update resolution dropdown
+                self.update_video_resolution_options([(width, height)], selected_mode)
+                
+                # Set default resolution
+                res_str = f"{width}x{height}"
+                self.video_resolution.set(res_str)
+                self.video_custom_width.set(str(width))
+                self.video_custom_height.set(str(height))
+                
+                # Update framerate
+                current_fps = self.video_framerate.get()
+                try:
+                    current_fps_int = int(current_fps)
+                    if current_fps_int > max_fps:
+                        self.video_framerate.set(str(max_fps))
+                except ValueError:
+                    self.video_framerate.set(str(max_fps))
+                
+                # Disable custom resolution if not "Custom"
+                self.update_video_custom_fields()
+                
+            else:
+                # In Auto mode, show all possible resolutions
+                self.update_resolution_options()
+                
+                # Enable custom resolution when "Custom" is selected
+                self.update_video_custom_fields()
+            
+        except Exception as e:
+            self.status_var.set(f"Error updating video options: {str(e)}")
+    
+    def on_still_sensor_mode_changed(self, event=None):
+        """Update resolution options based on selected sensor mode"""
+        try:
+            # Get the selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.still_sensor_mode.get())
+            
+            if selected_mode:
+                # Get resolution from the mode
+                width, height = selected_mode.get('size', (3280, 2464))
+                
+                # Update resolution dropdown
+                self.update_still_resolution_options([(width, height)], selected_mode)
+                
+                # Set default resolution
+                res_str = f"{width}x{height}"
+                self.still_resolution.set(res_str)
+                self.still_custom_width.set(str(width))
+                self.still_custom_height.set(str(height))
+                
+                # Disable custom resolution if not "Custom"
+                self.update_still_custom_fields()
+                
+            else:
+                # In Auto mode, show all possible resolutions
+                self.update_resolution_options()
+                
+                # Enable custom resolution when "Custom" is selected
+                self.update_still_custom_fields()
+            
+        except Exception as e:
+            self.status_var.set(f"Error updating still options: {str(e)}")
     
     def update_resolution_options(self):
         try:
@@ -697,65 +729,124 @@ class CameraInfoApp:
             for mode in sensor_modes:
                 if 'size' in mode:
                     width, height = mode['size']
-                    res_str = f"{width}x{height}"
-                    if res_str not in resolutions:
-                        resolutions.append(res_str)
+                    resolutions.append((width, height))
             
-            # Add common video resolutions if not in list
-            video_res = ["640x480", "1280x720", "1920x1080"]
-            for res in video_res:
-                if res not in resolutions:
-                    resolutions.append(res)
+            # Update video and still resolution options
+            self.update_video_resolution_options(resolutions)
+            self.update_still_resolution_options(resolutions)
             
-            # Sort resolutions by total pixels (ascending)
-            resolutions.sort(key=lambda x: int(x.split('x')[0]) * int(x.split('x')[1]))
-            
-            # Add 'Custom' option
-            resolutions.append("Custom")
-            
-            # Update video resolution dropdown
-            self.video_res_dropdown['values'] = resolutions
-            
-            # Set current value or default to 1280x720 for video
-            if self.video_resolution.get() not in resolutions:
-                if "1280x720" in resolutions:
-                    self.video_resolution.set("1280x720")
-                else:
-                    self.video_resolution.set(resolutions[0])
-            
-            # Update still resolution dropdown (use all resolutions)
-            self.still_res_dropdown['values'] = resolutions
-            
-            # Set current value or default to highest resolution for stills
-            if self.still_resolution.get() not in resolutions:
-                self.still_resolution.set(resolutions[-2])  # Last one before 'Custom'
-        
         except Exception as e:
             self.status_var.set(f"Error updating resolution options: {str(e)}")
     
+    def update_video_resolution_options(self, resolutions, sensor_mode=None):
+        # Create list of unique resolutions as strings
+        res_strings = []
+        for width, height in resolutions:
+            res_str = f"{width}x{height}"
+            if res_str not in res_strings:
+                res_strings.append(res_str)
+        
+        # Add common video resolutions if not in list and in Auto mode
+        if sensor_mode is None:
+            for res in ["640x480", "1280x720", "1920x1080"]:
+                if res not in res_strings:
+                    res_strings.append(res)
+        
+        # Sort resolutions by total pixels (ascending)
+        res_strings.sort(key=lambda x: int(x.split('x')[0]) * int(x.split('x')[1]))
+        
+        # Add 'Custom' option
+        res_strings.append("Custom")
+        
+        # Update video resolution dropdown
+        self.video_res_dropdown['values'] = res_strings
+        
+        # Set current value or default to appropriate resolution
+        if self.video_resolution.get() not in res_strings:
+            if sensor_mode and 'size' in sensor_mode:
+                width, height = sensor_mode['size']
+                self.video_resolution.set(f"{width}x{height}")
+            elif "1280x720" in res_strings:
+                self.video_resolution.set("1280x720")
+            else:
+                self.video_resolution.set(res_strings[0])
+    
+    def update_still_resolution_options(self, resolutions, sensor_mode=None):
+        # Create list of unique resolutions as strings
+        res_strings = []
+        for width, height in resolutions:
+            res_str = f"{width}x{height}"
+            if res_str not in res_strings:
+                res_strings.append(res_str)
+        
+        # Sort resolutions by total pixels (ascending)
+        res_strings.sort(key=lambda x: int(x.split('x')[0]) * int(x.split('x')[1]))
+        
+        # Add 'Custom' option
+        res_strings.append("Custom")
+        
+        # Update still resolution dropdown
+        self.still_res_dropdown['values'] = res_strings
+        
+        # Set current value or default to highest resolution for stills
+        if self.still_resolution.get() not in res_strings:
+            if sensor_mode and 'size' in sensor_mode:
+                width, height = sensor_mode['size']
+                self.still_resolution.set(f"{width}x{height}")
+            elif len(res_strings) > 1:
+                self.still_resolution.set(res_strings[-2])  # Last one before 'Custom'
+            else:
+                self.still_resolution.set(res_strings[0])
+    
+    def update_video_custom_fields(self):
+        """Enable or disable custom resolution fields for video"""
+        is_custom = self.video_resolution.get() == "Custom"
+        
+        # Set state of custom resolution fields
+        state = "normal" if is_custom else "disabled"
+        self.video_width_entry.config(state=state)
+        self.video_height_entry.config(state=state)
+        self.video_apply_custom_btn.config(state=state)
+    
+    def update_still_custom_fields(self):
+        """Enable or disable custom resolution fields for still"""
+        is_custom = self.still_resolution.get() == "Custom"
+        
+        # Set state of custom resolution fields
+        state = "normal" if is_custom else "disabled"
+        self.still_width_entry.config(state=state)
+        self.still_height_entry.config(state=state)
+        self.still_apply_custom_btn.config(state=state)
+    
     def on_video_resolution_changed(self, event=None):
         res = self.video_resolution.get()
-        if res == "Custom":
-            return  # Allow custom entries
         
-        try:
-            width, height = res.split("x")
-            self.video_custom_width.set(width)
-            self.video_custom_height.set(height)
-        except:
-            pass
+        # Update custom width/height fields
+        if res != "Custom":
+            try:
+                width, height = res.split("x")
+                self.video_custom_width.set(width)
+                self.video_custom_height.set(height)
+            except:
+                pass
+        
+        # Enable/disable custom fields
+        self.update_video_custom_fields()
     
     def on_still_resolution_changed(self, event=None):
         res = self.still_resolution.get()
-        if res == "Custom":
-            return  # Allow custom entries
         
-        try:
-            width, height = res.split("x")
-            self.still_custom_width.set(width)
-            self.still_custom_height.set(height)
-        except:
-            pass
+        # Update custom width/height fields
+        if res != "Custom":
+            try:
+                width, height = res.split("x")
+                self.still_custom_width.set(width)
+                self.still_custom_height.set(height)
+            except:
+                pass
+        
+        # Enable/disable custom fields
+        self.update_still_custom_fields()
     
     def apply_custom_video_resolution(self):
         try:
@@ -767,11 +858,34 @@ class CameraInfoApp:
                 messagebox.showerror("Invalid Resolution", "Width and height must be positive numbers")
                 return
             
-            # Check if framerate is too high for resolution
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.video_sensor_mode.get())
+            
+            if selected_mode:
+                # Check if resolution is valid for this sensor mode
+                mode_width, mode_height = selected_mode.get('size', (0, 0))
+                
+                if width > mode_width or height > mode_height:
+                    result = messagebox.askwarning("Resolution Warning", 
+                                            f"Custom resolution {width}x{height} exceeds sensor mode limit of {mode_width}x{mode_height}.\n\n"
+                                            "The camera will either scale down the image or use a different sensor mode.",
+                                            icon="warning",
+                                            type=messagebox.OKCANCEL)
+                    if result != "ok":
+                        return
+            
+            # Check framerate is compatible with resolution
             try:
                 framerate = int(self.video_framerate.get())
-                if width * height > 1920 * 1080 and framerate > 30:
-                    messagebox.showwarning("High Framerate", 
+                if selected_mode:
+                    max_fps = selected_mode.get('fps', 30)
+                    if framerate > max_fps:
+                        messagebox.showwarning("Framerate Warning", 
+                                            f"Framerate of {framerate}fps exceeds sensor mode limit of {max_fps}fps.\n"
+                                            "The maximum supported framerate will be used.")
+                        self.video_framerate.set(str(max_fps))
+                elif width * height > 1920 * 1080 and framerate > 30:
+                    messagebox.showwarning("High Framerate Warning", 
                                         f"Framerate of {framerate}fps may be too high for {width}x{height} resolution")
             except:
                 pass
@@ -797,6 +911,22 @@ class CameraInfoApp:
             if width <= 0 or height <= 0:
                 messagebox.showerror("Invalid Resolution", "Width and height must be positive numbers")
                 return
+            
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.still_sensor_mode.get())
+            
+            if selected_mode:
+                # Check if resolution is valid for this sensor mode
+                mode_width, mode_height = selected_mode.get('size', (0, 0))
+                
+                if width > mode_width or height > mode_height:
+                    result = messagebox.askwarning("Resolution Warning", 
+                                            f"Custom resolution {width}x{height} exceeds sensor mode limit of {mode_width}x{mode_height}.\n\n"
+                                            "The camera will either scale down the image or use a different sensor mode.",
+                                            icon="warning",
+                                            type=messagebox.OKCANCEL)
+                    if result != "ok":
+                        return
             
             # Set resolution to Custom
             self.still_resolution.set("Custom")
@@ -845,11 +975,22 @@ class CameraInfoApp:
                 except:
                     messagebox.showerror("Invalid Resolution", "Could not parse resolution")
                     return
+                    
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.video_sensor_mode.get())
             
             # Create video configuration
-            preview_config = self.picam2.create_video_configuration(
-                main={"size": (width, height), "format": "RGB888"}
-            )
+            if selected_mode:
+                # Use the selected sensor mode
+                preview_config = self.picam2.create_video_configuration(
+                    main={"size": (width, height), "format": "RGB888"},
+                    sensor=selected_mode
+                )
+            else:
+                # Auto mode
+                preview_config = self.picam2.create_video_configuration(
+                    main={"size": (width, height), "format": "RGB888"}
+                )
             
         else:  # still mode
             # Get still resolution
@@ -867,10 +1008,21 @@ class CameraInfoApp:
                     messagebox.showerror("Invalid Resolution", "Could not parse resolution")
                     return
             
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.still_sensor_mode.get())
+            
             # Create still configuration
-            preview_config = self.picam2.create_still_configuration(
-                main={"size": (width, height), "format": "RGB888"}
-            )
+            if selected_mode:
+                # Use the selected sensor mode
+                preview_config = self.picam2.create_still_configuration(
+                    main={"size": (width, height), "format": "RGB888"},
+                    sensor=selected_mode
+                )
+            else:
+                # Auto mode
+                preview_config = self.picam2.create_still_configuration(
+                    main={"size": (width, height), "format": "RGB888"}
+                )
         
         # Configure camera
         self.picam2.configure(preview_config)
@@ -942,10 +1094,21 @@ class CameraInfoApp:
                     messagebox.showerror("Invalid Resolution", "Could not parse resolution")
                     return
             
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.still_sensor_mode.get())
+            
             # Configure camera for still capture
-            still_config = self.picam2.create_still_configuration(
-                main={"size": (width, height)}
-            )
+            if selected_mode:
+                # Use the selected sensor mode
+                still_config = self.picam2.create_still_configuration(
+                    main={"size": (width, height)},
+                    sensor=selected_mode
+                )
+            else:
+                # Auto mode
+                still_config = self.picam2.create_still_configuration(
+                    main={"size": (width, height)}
+                )
             
             # Set status
             self.status_var.set("Configuring camera for still capture...")
@@ -978,6 +1141,7 @@ class CameraInfoApp:
             self.still_info_text.insert(tk.END, f"Filename: {filename}\n")
             self.still_info_text.insert(tk.END, f"Resolution: {width}x{height}\n")
             self.still_info_text.insert(tk.END, f"Format: {self.still_format_var.get()[1:]}\n")
+            self.still_info_text.insert(tk.END, f"Sensor Mode: {self.still_sensor_mode.get()}\n")
             self.still_info_text.insert(tk.END, f"Saved to: {self.still_dir_var.get()}\n")
             self.still_info_text.insert(tk.END, f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             
@@ -1024,10 +1188,30 @@ class CameraInfoApp:
                 messagebox.showerror("Invalid Duration", "Duration must be a valid number")
                 return
             
+            # Get selected sensor mode
+            selected_mode = self.get_selected_sensor_mode(self.video_sensor_mode.get())
+            
             # Configure camera for video recording
-            video_config = self.picam2.create_video_configuration(
-                main={"size": (width, height)}
-            )
+            if selected_mode:
+                # Use the selected sensor mode
+                video_config = self.picam2.create_video_configuration(
+                    main={"size": (width, height)},
+                    sensor=selected_mode
+                )
+                
+                # Check framerate against sensor mode
+                max_fps = selected_mode.get('fps', 30)
+                if framerate > max_fps:
+                    messagebox.showwarning("Framerate Warning", 
+                                        f"Requested framerate ({framerate}fps) exceeds sensor mode limit ({max_fps}fps).\n"
+                                        f"Setting framerate to {max_fps}fps.")
+                    framerate = max_fps
+                    self.video_framerate.set(str(max_fps))
+            else:
+                # Auto mode
+                video_config = self.picam2.create_video_configuration(
+                    main={"size": (width, height)}
+                )
             
             # Set status
             self.status_var.set("Configuring camera for video recording...")
@@ -1046,9 +1230,9 @@ class CameraInfoApp:
             
             # Create encoder based on selection
             if self.video_encoder.get() == "H264Encoder":
-                encoder = H264Encoder(bitrate=self.get_bitrate_from_quality())
+                encoder = H264Encoder(bitrate=self.get_bitrate_from_quality(), framerate=framerate)
             else:
-                encoder = MJPEGEncoder()
+                encoder = MJPEGEncoder(framerate=framerate)
             
             # Create appropriate output based on format
             format_extension = self.video_format.get()
@@ -1092,6 +1276,7 @@ class CameraInfoApp:
             self.video_info_text.insert(tk.END, f"Duration: {duration}s\n")
             self.video_info_text.insert(tk.END, f"Encoder: {self.video_encoder.get()}\n")
             self.video_info_text.insert(tk.END, f"Format: {self.video_format.get()[1:]}\n")
+            self.video_info_text.insert(tk.END, f"Sensor Mode: {self.video_sensor_mode.get()}\n")
             
             # Add info about the output type
             if isinstance(output, FfmpegOutput):
